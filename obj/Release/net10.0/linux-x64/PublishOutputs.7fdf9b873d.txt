@@ -1,0 +1,5 @@
+/home/su1/bin/lyre-player/glp.pdb
+/home/su1/bin/lyre-player/Melanchall_DryWetMidi_Native32.dll
+/home/su1/bin/lyre-player/Melanchall_DryWetMidi_Native64.dll
+/home/su1/bin/lyre-player/Melanchall_DryWetMidi_Native64.dylib
+/home/su1/bin/lyre-player/glp
