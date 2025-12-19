@@ -56,6 +56,73 @@ class PlayerTab(Gtk.Box):
         track_frame.set_child(scrolled)
         self.append(track_frame)
         
+        # Notes Viewer (Keyboard Visualization) section
+        keyboard_frame = Gtk.Frame()
+        keyboard_frame.set_label("Notes Viewer")
+        
+        keyboard_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        keyboard_container.set_margin_top(12)
+        keyboard_container.set_margin_bottom(12)
+        keyboard_container.set_margin_start(8)
+        keyboard_container.set_margin_end(8)
+        
+        # Store key buttons for highlighting
+        self.key_buttons = {}
+        
+        # Note names and keys for each row (from key_mapper.py)
+        rows_data = [
+            # Upper octave (C5-B5) - top row
+            [('C5', 'Q'), ('D5', 'W'), ('E5', 'E'), ('F5', 'R'), ('G5', 'T'), ('A5', 'Y'), ('B5', 'U')],
+            # Middle octave (C4-B4) - middle row  
+            [('C4', 'A'), ('D4', 'S'), ('E4', 'D'), ('F4', 'F'), ('G4', 'G'), ('A4', 'H'), ('B4', 'J')],
+            # Lower octave (C3-B3) - bottom row
+            [('C3', 'Z'), ('D3', 'X'), ('E3', 'C'), ('F3', 'V'), ('G3', 'B'), ('A3', 'N'), ('B3', 'M')],
+        ]
+        
+        # MIDI note numbers for each position (for tracking)
+        midi_notes = [
+            [72, 74, 76, 77, 79, 81, 83],  # Upper octave
+            [60, 62, 64, 65, 67, 69, 71],  # Middle octave
+            [48, 50, 52, 53, 55, 57, 59],  # Lower octave
+        ]
+        
+        for row_idx, row_data in enumerate(rows_data):
+            row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            row_box.set_halign(Gtk.Align.CENTER)
+            
+            for col_idx, (note_name, key_char) in enumerate(row_data):
+                midi_note = midi_notes[row_idx][col_idx]
+                
+                # Create a button for each key
+                key_btn = Gtk.Button()
+                key_btn.set_size_request(50, 50)
+                
+                # Create label with note name and key
+                label_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+                label_box.set_valign(Gtk.Align.CENTER)
+                
+                note_label = Gtk.Label(label=note_name)
+                note_label.add_css_class('caption')
+                note_label.set_markup(f"<b>{note_name}</b>")
+                
+                key_label = Gtk.Label(label=key_char)
+                key_label.add_css_class('dim-label')
+                key_label.add_css_class('caption')
+                
+                label_box.append(note_label)
+                label_box.append(key_label)
+                key_btn.set_child(label_box)
+                
+                # Store reference for highlighting
+                self.key_buttons[midi_note] = key_btn
+                
+                row_box.append(key_btn)
+            
+            keyboard_container.append(row_box)
+        
+        keyboard_frame.set_child(keyboard_container)
+        self.append(keyboard_frame)
+        
         # Timeline section
         timeline_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         
@@ -298,3 +365,47 @@ class PlayerTab(Gtk.Box):
         self.play_button.set_tooltip_text('Play')
         self._stop_update_timer()
         self._update_position(0)
+        # Clear all key highlights
+        self._clear_all_highlights()
+    
+    def highlight_key(self, midi_note: int):
+        """Highlight a key when its note is played."""
+        # Handle transposition by checking nearby notes
+        key_mapper = self.app.key_mapper
+        transpose = key_mapper.transpose
+        
+        # The actual note being searched for
+        actual_note = midi_note
+        
+        # Try to find the button for this note (accounting for clamping)
+        btn = self.key_buttons.get(actual_note)
+        
+        if not btn:
+            # Try clamping like the midi player does
+            while actual_note > 83:
+                actual_note -= 12
+            while actual_note < 48:
+                actual_note += 12
+            btn = self.key_buttons.get(actual_note)
+        
+        if btn:
+            btn.add_css_class('suggested-action')
+            # Remove highlight after 200ms
+            GLib.timeout_add(200, self._unhighlight_key, actual_note)
+    
+    def _unhighlight_key(self, midi_note: int):
+        """Remove highlight from a key."""
+        btn = self.key_buttons.get(midi_note)
+        if btn:
+            btn.remove_css_class('suggested-action')
+        return False  # Don't repeat
+    
+    def _clear_all_highlights(self):
+        """Clear all key highlights."""
+        for midi_note, btn in self.key_buttons.items():
+            btn.remove_css_class('suggested-action')
+    
+    def on_note_played(self, note):
+        """Called when a note is played - highlight the corresponding key."""
+        GLib.idle_add(self.highlight_key, note.note)
+

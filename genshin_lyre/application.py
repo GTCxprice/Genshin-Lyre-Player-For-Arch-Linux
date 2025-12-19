@@ -5,7 +5,8 @@ Manages the GTK application lifecycle and global state.
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Gio, GLib, Gdk
+gi.require_version('Adw', '1')
+from gi.repository import Gtk, Gio, GLib, Gdk, Adw
 
 from .settings import Settings
 from .key_mapper import KeyMapper
@@ -45,6 +46,7 @@ class LyreApplication:
         
         # Set up playback callbacks
         self.midi_player.on_playback_finished = self._on_playback_finished
+        self.midi_player.on_note_played = self._on_note_played
         
         # Set up actions
         self._setup_actions()
@@ -140,10 +142,12 @@ class LyreApplication:
         )
     
     def apply_theme(self, theme):
-        """Apply color theme."""
-        settings = Gtk.Settings.get_default()
-        if settings:
-            settings.set_property('gtk-application-prefer-dark-theme', theme == 'dark')
+        """Apply color theme using Adw.StyleManager."""
+        style_manager = Adw.StyleManager.get_default()
+        if theme == 'dark':
+            style_manager.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
+        else:
+            style_manager.set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
     
     def _on_about(self, action, param):
         """Show about dialog."""
@@ -165,6 +169,11 @@ class LyreApplication:
         """Handle playback finished callback."""
         if self.main_window:
             GLib.idle_add(self.main_window.player_tab.on_playback_finished)
+    
+    def _on_note_played(self, note):
+        """Handle note played callback - forward to player tab for visualization."""
+        if self.main_window:
+            self.main_window.player_tab.on_note_played(note)
     
     def run(self, args=None):
         """Run the application."""
